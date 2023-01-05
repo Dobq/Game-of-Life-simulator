@@ -1,16 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat May 21 11:27:05 2022
-
-@author: dell
-"""
 
 res=18   #symulacja odbywa się na kawadracie o boku długości res
          #simulation runs on the square of size res by res
 size=15  #size określa ile na ile pikseli ma komórka
          #cell is size by size square of pixels
 leng=120 #określa długość symulacji
-         #leng is lenght of (amount of frames)
+         #leng is lenght of simulation (amount of frames)
 sta='noise'
 
 #sta określa stan początkowy:
@@ -33,11 +27,11 @@ sta='noise'
 #oczywiście łatwo można wbudować więcej ciekawych stanów początkowych
 #ofc more initial states may be inbuilt easily
 
-import imageio as im
-import PIL
-import numpy as np
-import random as ra
-import math as ma
+from imageio.v2 import imread,mimsave
+from PIL.Image import fromarray 
+from numpy import array,uint8
+from random import randint
+from math import floor,ceil
 
 ##############################################################################
 
@@ -46,7 +40,8 @@ import math as ma
 
 #określamy sąsiedztwo
 #we define neighbourhood
-NEI=[[i,j] for i in [-1,0,1] for j in [-1,0,1] if not i**2+j**2==0]
+NEI=[[i,j] for i in [-1,0,1] for j in [-1,0,1]]
+NEI.pop(4)
 
 def ev(y):
     if y==1:
@@ -59,13 +54,14 @@ def ev(y):
 def it(M,i,j):
     if M[i][j]==2:
         return 2
-    ż=sum([ev(M[i+k[0]][j+k[1]]) for k in NEI])
-    if (M[i][j]==1) & ((ż==2) | (ż==3)):
-        return 1
-    if (M[i][j]==0) & (ż==3):
-        return 1
     else:
-        return 0
+        ż=sum([ev(M[i+k[0]][j+k[1]]) for k in NEI])
+        if (M[i][j]==1) and ((ż==2) or (ż==3)):
+            return 1
+        elif (M[i][j]==0) and (ż==3):
+            return 1
+        else:
+            return 0
 
 #określamy funkcję rzucającą jedną klatkę symulacji w kolejną
 #we define a function turning frame to a next one
@@ -87,25 +83,20 @@ def fRGB(n):
     if n==2:
         return [255,255,255]
 
-#określamy funkcję przetwarzającą listę list list na coś zjadliwego dla funkcji Image.fromarray
-#we define a function converting list of lists of lists to somthing edible for Image.fromarray function
+#określamy funkcję przetwarzającą listę list stanów na array [R,G,B]ów
+#we define a function converting list of lists of states to array of [R,G,B]s
 def arrayRGB(L):
-    l=len(L)
-    data=np.zeros((l,l,3),dtype=np.uint8)
-    for i in range(l):
-        for j in range(l):
-            data[i,j]=fRGB(L[i][j])
-    return data
+    return array([array(list(map(fRGB,L[i]))) for i in range(len(L))],dtype=uint8)
 
 ##############################################################################
 
 #tu tworzymy funkcję przeskalowującą (funkcje wbudowane w PIL rozmazują obraz)
 #we define a function making image bigger (inbuilt PIL's functions blurs image)
 def rescale(M):
-    return [[M[ma.floor(i/size)][ma.floor(j/size)] for j in range(res*size)] for i in range(res*size)]
+    return [[M[floor(i/size)][floor(j/size)] for j in range(res*size)] for i in range(res*size)]
 
 #tu tworzymy funkcję rzucającą stan początkowy w listę przeskalowanych klatek
-#we define a function making a list of rescaled frames out from initial state
+#we define a function that makes a list of rescaled frames out from initial state
 def gra(M):
     K=[M]
     for i in range(leng):
@@ -117,21 +108,19 @@ def gra(M):
 names=[]
 def graf(K):
     for i in range(len(K)):
-        img=PIL.Image.fromarray(arrayRGB(K[i]),'RGB')
         names.append('sym'+str(i)+'.png')
-        img.save('sym'+str(i)+'.png')
+        fromarray(arrayRGB(K[i]),'RGB').save('sym'+str(i)+'.png')
 
 #tu tworzymy funkcję przerabiającą listę grafik na .gif
 #we define a function converting list of graphics to .gif file
 def gif(L):
-    imag=[im.imread(l) for l in L]
-    im.mimsave('movie.gif',imag)
+    mimsave('movie.gif',[imread(l) for l in L])
 
 #powyższa metoda zapewne jest dość nieoptymalna:
-#pierwotnie próbowałem zrobić tak, by grafiki były podawane bezpośrednio do imag,
+#pierwotnie próbowałem zrobić tak, by grafiki były podawane bezpośrednio do mimsave,
 #a nie były zapisywane wszystkie "na zewnątrz"
 #probably above method isn't optimal:
-#firstly I tried to upload graphics directly to imag
+#firstly I tried to upload graphics directly to mimsave
 #instead of being stored somewhere "outside"
 
 ##############################################################################
@@ -140,9 +129,9 @@ def gif(L):
 #we create a place of action
 
 #funkcja tworząca przestrzeń na symulację oraz ramkę ograniczającą
-#0 oznacza nieżywą komórkę, 2 oznacza ramkę
+#0 oznacza nieżywą komórkę, 1 żywą, 2 oznacza ramkę
 #function creating space for simulation and a border
-#0 means dead cell, 2 means border cell
+#0 means dead cell, 1 means living one, 2 means border cell
 def ram(i,j):
     if i*j*(i-res+1)*(j-res+1)==0:
         return 2
@@ -157,7 +146,7 @@ M=[[ram(i,j) for j in range(res)] for i in range(res)]
 if sta=='noise':
     for i in range(1,res-1):
         for j in range(1,res-1):
-            M[i][j]=ra.randint(0,1)
+            M[i][j]=randint(0,1)
 
 T=[[1,1,0,0,0,0,0,0,1,1],
    [0,1,1,1,1,1,1,1,1,0],
@@ -175,7 +164,7 @@ T=[[1,1,0,0,0,0,0,0,1,1],
 if sta=='turtle':
     for i in range(12):
         for j in range(10):
-            M[i+2][j+ma.ceil(res/2-5)]=T[i][j]
+            M[i+2][j+ceil(res/2-5)]=T[i][j]
   
 C=[[0,0,0,1,1,0,0,0],
    [0,0,0,1,1,0,0,0],
@@ -193,7 +182,7 @@ C=[[0,0,0,1,1,0,0,0],
 if sta=='copperhead':
     for i in range(12):
         for j in range(8):
-            M[i+2][j+ma.ceil(res/2-4)]=C[i][j]
+            M[i+2][j+ceil(res/2-4)]=C[i][j]
 
 E=[[0,0,0,1,1,1],
    [0,0,0,1,1,1],
@@ -205,11 +194,11 @@ E=[[0,0,0,1,1,1],
 if sta=='eight':
     for i in range(6):
         for j in range(6):
-            M[i+ma.ceil(res/2-3)][j+ma.ceil(res/2-3)]=E[i][j]
+            M[i+ceil(res/2-3)][j+ceil(res/2-3)]=E[i][j]
  
 if type(sta)==int:
     for i in range(sta):
-        M[ma.ceil(res/2)][ma.ceil((res-sta)/2)+i]=1
+        M[ceil(res/2)][ceil((res-sta)/2)+i]=1
 
 ##############################################################################
 
@@ -218,3 +207,5 @@ if type(sta)==int:
 
 graf(gra(M))
 gif(names)
+
+##############################################################################
